@@ -1,0 +1,12 @@
+[paths]
+source =
+  smalld_click/
+  */site-packages/smalld_click
+
+[run]
+source=
+  smalld_click
+  test
+
+[report]
+show_missing=True
