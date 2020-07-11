@@ -83,8 +83,8 @@ This is similar to Click's `get_current_context()`
 
 ### Patched functionality
 
-You can use Click's functions directly, like `click.abort()`, `click.echo`, and `click.prompt`. But, hidden prompts
-are not supported yet.
+You can use `click.echo`, and `click.prompt` directly to send/wait for messages. However, hidden prompts are not
+supported yet and shouldn't be used.
 
 Note that, echo and prompt will send a message in the same channel as the message that triggered the command invocation.
 
