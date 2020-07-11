@@ -1,6 +1,6 @@
 import contextlib
+import logging
 import shlex
-import sys
 import threading
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -8,9 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 import click
 from pkg_resources import get_distribution
 
-SmallDCliRunnerContext = namedtuple("SmallDCliRunnerContext", ["runner", "message"])
-
 __version__ = get_distribution("smalld-click").version
+
+
+logger = logging.getLogger("smalld_click")
+
+
+SmallDCliRunnerContext = namedtuple("SmallDCliRunnerContext", ["runner", "message"])
 
 
 def get_runner_context():
@@ -18,15 +22,13 @@ def get_runner_context():
 
 
 class SmallDCliRunner:
-    def __init__(self, smalld, cli, prefix="", timeout=50, executor=None, **kwargs):
+    def __init__(self, smalld, cli, prefix="", timeout=50, executor=None):
         self.smalld = smalld
         self.cli = cli
         self.prefix = prefix
         self.timeout = timeout
         self.conversations = {}
-        self.executor = (
-            executor if executor is not None else ThreadPoolExecutor(**kwargs)
-        )
+        self.executor = executor if executor is not None else ThreadPoolExecutor()
 
     def __enter__(self):
         self.smalld.on_message_create()(self.on_message)
@@ -90,7 +92,7 @@ def managed_click_execution():
         except TimeoutError:
             pass
         except Exception as e:
-            sys.excepthook(type(e), e, None)
+            logger.exception("exception in command handler")
 
 
 class Completable:
