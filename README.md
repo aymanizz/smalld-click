@@ -43,10 +43,12 @@ with SmallDCliRunner(smalld, hello, prefix="++"):
     smalld.run()
 ```
 
-For this CLI example, if a user sends the message "++hello --count 2", then the bot will ask the user -
+For this CLI example, if a user sends the message "++hello --count=2", then the bot will ask the user -
 by sending a message in the same channel - for their name, "Your name:".
 
-If the user answers with "Ayman", for example, the bot will send the message, "Hello Ayman", twice.
+If the user answers with "lymni", for example, the bot will send the message, "Hello lymni", twice.
+
+![Example Run](examples/example_run.png)
 
 There is also a timeout for how long the bot will wait for the user's message, if the timeout is exceeded the bot will
 simply drop the execution of the command.
