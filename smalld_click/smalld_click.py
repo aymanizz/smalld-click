@@ -22,7 +22,7 @@ def get_runner_context():
 
 
 class SmallDCliRunner:
-    def __init__(self, smalld, cli, prefix="", timeout=50, executor=None):
+    def __init__(self, smalld, cli, prefix="", timeout=60, executor=None):
         self.smalld = smalld
         self.cli = cli
         self.prefix = prefix
