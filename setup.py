@@ -24,7 +24,7 @@ setup(
     install_requires=["smalld>=0.1.4", "click>=7.1.2"],
     setup_requires=["setuptools-scm==4.1.2"],
     classifiers=[
-        "Development Status :: 1 - Beta",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
