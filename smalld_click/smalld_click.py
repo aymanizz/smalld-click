@@ -26,7 +26,7 @@ class SmallDCliRunner:
         )
 
     def __enter__(self):
-        self.smalld.on_message_create(self.on_message)
+        self.smalld.on_message_create()(self.on_message)
         return self
 
     def __exit__(self, *args):
