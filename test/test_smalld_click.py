@@ -1,11 +1,11 @@
 from concurrent.futures import Executor
 from unittest.mock import Mock, patch
 
+import click
 import pytest
 from smalld_click.smalld_click import (
     Completable,
     SmallDCliRunner,
-    click,
     get_runner_context,
 )
 
