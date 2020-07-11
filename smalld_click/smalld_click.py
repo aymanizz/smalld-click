@@ -6,8 +6,11 @@ from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 
 import click
+from pkg_resources import get_distribution
 
 SmallDCliRunnerContext = namedtuple("SmallDCliRunnerContext", ["runner", "message"])
+
+__version__ = get_distribution("smalld-click").version
 
 
 def get_runner_context():
