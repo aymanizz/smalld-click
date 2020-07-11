@@ -4,7 +4,7 @@ from setuptools import setup
 
 
 def readme():
-    readme_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "README")
+    readme_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "README.md")
 
     with open(readme_path, encoding="utf-8") as f:
         return f.read()
