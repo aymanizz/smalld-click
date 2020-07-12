@@ -14,7 +14,12 @@ __version__ = get_distribution("smalld-click").version
 logger = logging.getLogger("smalld_click")
 
 
-SmallDCliRunnerContext = namedtuple("SmallDCliRunnerContext", ["runner", "message"])
+class SmallDCliRunnerContext:
+    __slots__ = "runner", "message"
+
+    def __init__(self, runner, message):
+        self.runner = runner
+        self.message = message
 
 
 def get_runner_context():
@@ -119,12 +124,16 @@ def echo(message="", *args, **kwargs):
     if not message:
         return
 
-    runner, msg = get_runner_context()
+    ctx = get_runner_context()
+    runner, msg = ctx.runner, ctx.message
+
     runner.smalld.post(f"/channels/{msg['channel_id']}/messages", {"content": message})
 
 
 def visible_prompt(prompt="", *args, **kwargs):
-    runner, msg = get_runner_context()
+    ctx = get_runner_context()
+    runner, msg = ctx.runner, ctx.message
+
     if prompt:
         echo(prompt)
     return runner.wait_for_message(msg)

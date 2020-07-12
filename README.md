@@ -70,10 +70,10 @@ The `SmallDCliRunner` is the core class for running CLI applications.
 Instances of this class should be used as a context manager, to properly close the executor when the bot stops.
 
 ```python
-SmallDCliRunnerContext = namedtuple("SmallDCliRunnerContext", ["runner", "message"])
+SmallDCliRunnerContext(runner, message)
 ```
 
-The context for this command invocation, consists of the runner itself, and the message payload that triggered the
+The context for this command invocation, holds the runner instance, and the message payload that triggered the
 execution of this command.
 
 ```python
