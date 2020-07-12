@@ -1,5 +1,5 @@
-from concurrent.futures import Executor
-from unittest.mock import Mock, call, patch
+from concurrent import futures
+from unittest.mock import Mock, call
 
 import click
 
@@ -7,19 +7,8 @@ import pytest
 from smalld_click.smalld_click import SmallDCliRunner, get_runner_context
 
 
-class ImmediateExecutor(Executor):
-    def submit(self, fn, *args, **kwargs):
-        fn(*args, **kwargs)
-
-
 def make_message(content, channel_id="channel_id", author_id="author_id"):
     return {"content": content, "channel_id": channel_id, "author": {"id": author_id}}
-
-
-@pytest.fixture(autouse=True)
-def completable():
-    with patch("smalld_click.smalld_click.Completable") as completable:
-        yield completable.return_value
 
 
 @pytest.fixture
@@ -29,9 +18,7 @@ def smalld():
 
 @pytest.fixture
 def subject(smalld):
-    with SmallDCliRunner(
-        smalld, None, timeout=2, executor=ImmediateExecutor()
-    ) as subject:
+    with SmallDCliRunner(smalld, None, timeout=1) as subject:
         yield subject
 
 
@@ -46,6 +33,7 @@ def test_exposes_correct_context(subject):
     subject.cli = command
     data = make_message("command")
     f = subject.on_message(data)
+    futures.wait([f], 0.5)
 
     assert ctx is not None
     assert ctx.runner is subject
@@ -64,6 +52,7 @@ def test_parses_command(subject):
 
     subject.cli = command
     f = subject.on_message(make_message("command argument --opt=option"))
+    futures.wait([f], 0.5)
 
     assert argument == "argument"
     assert option == "option"
@@ -76,7 +65,8 @@ def test_handles_echo(subject, smalld):
 
     subject.cli = command
     data = make_message("command")
-    subject.on_message(data)
+    f = subject.on_message(data)
+    futures.wait([f], 0.5)
 
     smalld.post.assert_called_once_with(
         f"/channels/{data['channel_id']}/messages", {"content": "echo\n"}
@@ -91,7 +81,8 @@ def test_buffers_calls_to_echo(subject, smalld):
 
     subject.cli = command
     data = make_message("command")
-    subject.on_message(data)
+    f = subject.on_message(data)
+    futures.wait([f], 0.5)
 
     smalld.post.assert_called_once_with(
         f"/channels/{data['channel_id']}/messages", {"content": "echo 1\necho 2\n"}
@@ -104,48 +95,52 @@ def test_should_not_send_empty_messages(subject, smalld):
         click.echo("")
 
     subject.cli = command
-    subject.on_message(make_message("command"))
+    f = subject.on_message(make_message("command"))
+    futures.wait([f], 0.5)
 
     assert smalld.post.call_count == 0
 
 
-def completable_wait_side_effect(timeout):
-    return True
+def test_handles_prompt(subject, smalld):
+    result = None
 
-
-def test_handles_prompt(subject, smalld, completable):
     @click.command()
     def command():
-        click.prompt("prompt")
+        nonlocal result
+        result = click.prompt("prompt")
 
-    completable.wait.side_effect = completable_wait_side_effect
     subject.cli = command
     data = make_message("command")
-    subject.on_message(data)
+    f = subject.on_message(data)
     subject.on_message(make_message("result"))
+    futures.wait([f], 0.5)
 
     smalld.post.assert_called_once_with(
         f"/channels/{data['channel_id']}/messages", {"content": "prompt: "}
     )
-    completable.complete_with.assert_called_once_with("result")
 
 
-def test_sends_prompts_without_buffering(subject, smalld, completable):
+def test_sends_prompts_without_buffering(subject, smalld):
+    result1, result2 = None, None
+
     @click.command()
     def command():
+        nonlocal result1, result2
         click.echo("echo 1")
-        click.prompt("prompt 1")
-        click.prompt("prompt 2")
+        result1 = click.prompt("prompt 1")
+        result2 = click.prompt("prompt 2")
         click.echo("echo 2")
 
-    completable.wait.side_effect = completable_wait_side_effect
     subject.cli = command
     data = make_message("command")
     route = f"/channels/{data['channel_id']}/messages"
 
-    subject.on_message(data)
+    f = subject.on_message(data)
+    futures.wait([f], 0.2)
     subject.on_message(make_message("result"))
+    futures.wait([f], 0.2)
     subject.on_message(make_message("result"))
+    futures.wait([f], 0.2)
 
     smalld.post.assert_has_calls(
         [
@@ -154,19 +149,18 @@ def test_sends_prompts_without_buffering(subject, smalld, completable):
             call(route, {"content": "echo 2\n"}),
         ]
     )
+    assert result1 == result2 == "result"
 
 
-def test_drops_conversation_when_timed_out(subject, completable):
-    def wait_side_effect(timeout):
-        return False
-
-    completable.wait.side_effect = wait_side_effect
-
+def test_drops_conversation_when_timed_out(subject):
     @click.command()
     def command():
         click.prompt("prompt")
 
     subject.cli = command
-    subject.on_message(make_message("command"))
+    subject.timeout = 0.2
+
+    f = subject.on_message(make_message("command"))
+    futures.wait([f], 0.3)
 
     assert not subject.conversations
