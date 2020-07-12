@@ -128,12 +128,12 @@ def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
     if ctx.buffered and not flush:
         return
 
-    smalld, msg = ctx.runner.smalld, ctx.message
     content = ctx.echo_buffer.getvalue()
+    if not content.strip():
+        return
     ctx.echo_buffer = StringIO()
 
-    if not content:
-        return
+    smalld, msg = ctx.runner.smalld, ctx.message
     smalld.post(f"/channels/{msg['channel_id']}/messages", {"content": content})
 
 

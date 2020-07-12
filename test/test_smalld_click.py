@@ -98,6 +98,17 @@ def test_buffers_calls_to_echo(subject, smalld):
     )
 
 
+def test_should_not_send_empty_messages(subject, smalld):
+    @click.command()
+    def command():
+        click.echo("")
+
+    subject.cli = command
+    subject.on_message(make_message("command"))
+
+    assert smalld.post.call_count == 0
+
+
 def completable_wait_side_effect(timeout):
     return True
 
