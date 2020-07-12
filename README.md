@@ -48,7 +48,11 @@ by sending a message in the same channel - for their name, "Your name:".
 
 If the user answers with "lymni", for example, the bot will send the message, "Hello lymni", twice.
 
-![Example Run](examples/example_run.png)
+Notice that the bot responds in a single message, instead of two, even though we call `click.echo` multiple times.
+This is because calls to echo are buffered. However, calls to prompt will cause this buffer to be flushed and its
+content is sent immediately.
+
+![Example Run](https://raw.githubusercontent.com/aymanizz/smalld-click/master/examples/example_run.png)
 
 There is also a timeout for how long the bot will wait for the user's message, if the timeout is exceeded the bot will
 simply drop the execution of the command.
@@ -89,6 +93,9 @@ You can use `click.echo`, and `click.prompt` directly to send/wait for messages.
 supported yet and shouldn't be used.
 
 Note that, echo and prompt will send a message in the same channel as the message that triggered the command invocation.
+
+Calls to echo are buffered, the buffer is flushed either when there is a prompt or when the command finishes execution.
+It's also possible to flush the buffer by passing `flush=True` to `click.echo` call.
 
 ## Acknowledgements
 
