@@ -1,5 +1,5 @@
 from concurrent.futures import Executor
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import click
 
@@ -79,19 +79,46 @@ def test_handles_echo(subject, smalld):
     subject.on_message(data)
 
     smalld.post.assert_called_once_with(
-        f"/channels/{data['channel_id']}/messages", {"content": "echo"}
+        f"/channels/{data['channel_id']}/messages", {"content": "echo\n"}
     )
 
 
-def test_handles_prompt(subject, smalld, completable):
-    def wait_side_effect(timeout):
-        return True
+def test_buffers_calls_to_echo(subject, smalld):
+    @click.command()
+    def command():
+        click.echo("echo 1")
+        click.echo("echo 2")
 
+    subject.cli = command
+    data = make_message("command")
+    subject.on_message(data)
+
+    smalld.post.assert_called_once_with(
+        f"/channels/{data['channel_id']}/messages", {"content": "echo 1\necho 2\n"}
+    )
+
+
+def test_should_not_send_empty_messages(subject, smalld):
+    @click.command()
+    def command():
+        click.echo("")
+
+    subject.cli = command
+    subject.on_message(make_message("command"))
+
+    assert smalld.post.call_count == 0
+
+
+def completable_wait_side_effect(timeout):
+    return True
+
+
+def test_handles_prompt(subject, smalld, completable):
     @click.command()
     def command():
         click.prompt("prompt")
 
-    completable.wait.side_effect = wait_side_effect
+    completable.wait.side_effect = completable_wait_side_effect
     subject.cli = command
     data = make_message("command")
     subject.on_message(data)
@@ -101,6 +128,32 @@ def test_handles_prompt(subject, smalld, completable):
         f"/channels/{data['channel_id']}/messages", {"content": "prompt: "}
     )
     completable.complete_with.assert_called_once_with("result")
+
+
+def test_sends_prompts_without_buffering(subject, smalld, completable):
+    @click.command()
+    def command():
+        click.echo("echo 1")
+        click.prompt("prompt 1")
+        click.prompt("prompt 2")
+        click.echo("echo 2")
+
+    completable.wait.side_effect = completable_wait_side_effect
+    subject.cli = command
+    data = make_message("command")
+    route = f"/channels/{data['channel_id']}/messages"
+
+    subject.on_message(data)
+    subject.on_message(make_message("result"))
+    subject.on_message(make_message("result"))
+
+    smalld.post.assert_has_calls(
+        [
+            call(route, {"content": "echo 1\nprompt 1: "}),
+            call(route, {"content": "prompt 2: "}),
+            call(route, {"content": "echo 2\n"}),
+        ]
+    )
 
 
 def test_drops_conversation_when_timed_out(subject, completable):
