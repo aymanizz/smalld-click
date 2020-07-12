@@ -1,8 +1,8 @@
+import time
 from concurrent import futures
 from unittest.mock import Mock, call
 
 import click
-import time
 
 import pytest
 from smalld_click.smalld_click import SmallDCliRunner, get_runner_context
@@ -12,7 +12,7 @@ def make_message(content, channel_id="channel_id", author_id="author_id"):
     return {"content": content, "channel_id": channel_id, "author": {"id": author_id}}
 
 
-def assert_completes(future, timeout=0.2):
+def assert_completes(future, timeout=0.5):
     done, _ = futures.wait([future], timeout)
     if future not in done:
         raise AssertionError("timed out waiting for future to complete")
