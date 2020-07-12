@@ -120,14 +120,13 @@ def echo(message="", *args, **kwargs):
         return
 
     runner, msg = get_runner_context()
-    channel_id = msg["channel_id"]
     runner.smalld.post(f"/channels/{msg['channel_id']}/messages", {"content": message})
 
 
-def prompt(message="", *args, **kwargs):
+def visible_prompt(prompt="", *args, **kwargs):
     runner, msg = get_runner_context()
-    if message:
-        echo(message, send=True)
+    if prompt:
+        echo(prompt)
     return runner.wait_for_message(msg)
 
 
@@ -138,4 +137,4 @@ click.termui.echo = echo
 click.decorators.echo = echo
 click.exceptions.echo = echo
 
-click.termui.visible_prompt_func = prompt
+click.termui.visible_prompt_func = visible_prompt
