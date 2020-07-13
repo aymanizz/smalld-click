@@ -13,6 +13,7 @@ DM_CHANNEL_ID = "dm_channel_id"
 POST_MESSAGE_ROUTE = f"/channels/{CHANNEL_ID}/messages"
 GET_DM_CHANNEL_ROUTE = "/users/@me/channels"
 POST_DM_MESSAGE_ROUTE = f"/channels/{DM_CHANNEL_ID}/messages"
+POST_OPEN_DM_ROUTE = "/users/@me/channels"
 
 
 def make_message(content, author_id=AUTHOR_ID, channel_id=CHANNEL_ID):
@@ -31,7 +32,7 @@ def smalld():
 
     def post_side_effect(route, data=None):
         if route == "/users/@me/channels":
-            return {"id": "dm_channel_id"}
+            return {"id": DM_CHANNEL_ID}
 
     mock.post.side_effect = post_side_effect
     return mock
@@ -224,8 +225,10 @@ def test_continues_conversation_in_DM_after_hidden_prompt(subject, smalld):
     subject.on_message(make_message("result", channel_id=DM_CHANNEL_ID))
 
     assert_completes(f)
+    assert smalld.post.call_count == 3
     smalld.post.assert_has_calls(
         [
+            call(POST_OPEN_DM_ROUTE, {"recipient_id": AUTHOR_ID}),
             call(POST_DM_MESSAGE_ROUTE, {"content": "echo 1\nprompt: "}),
             call(POST_DM_MESSAGE_ROUTE, {"content": "echo 2\n"}),
         ]

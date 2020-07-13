@@ -20,7 +20,7 @@ class SmallDCliRunnerContext:
         self.message = message
         self.channel_id = message["channel_id"]
         self.echo_buffer = StringIO()
-        self.buffered = True
+        self.is_safe = False
 
 
 def get_runner_context():
@@ -125,7 +125,7 @@ def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
     ctx = get_runner_context()
 
     click_echo(message, file=ctx.echo_buffer, nl=nl, *args, **kwargs)
-    if ctx.buffered and not flush:
+    if not flush:
         return
 
     content = ctx.echo_buffer.getvalue()
@@ -140,12 +140,13 @@ def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
 def prompt(text, default=None, hide_input=False, *args, **kwargs):
     ctx = get_runner_context()
 
-    if hide_input:
+    if hide_input and not ctx.is_safe:
         author_id = ctx.message["author"]["id"]
         channel = ctx.runner.smalld.post(
             "/users/@me/channels", {"recipient_id": author_id}
         )
         ctx.channel_id = channel["id"]
+        ctx.is_safe = True
 
     return click_prompt(text, default, hide_input, *args, **kwargs)
 
