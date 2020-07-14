@@ -15,12 +15,67 @@ logger = logging.getLogger("smalld_click")
 
 
 class SmallDCliRunnerContext:
-    def __init__(self, runner, message):
+    def __init__(self, runner, message, timeout):
         self.runner = runner
+        self.smalld = runner.smalld
         self.message = message
+        self.timeout = timeout
         self.channel_id = message["channel_id"]
+        self.user_id = message["author"]["id"]
         self.echo_buffer = StringIO()
         self.is_safe = False
+
+    def ensure_safe(self):
+        if self.is_safe:
+            return
+
+        channel = self.runner.smalld.post(
+            "/users/@me/channels", {"recipient_id": self.user_id}
+        )
+        self.channel_id = channel["id"]
+        self.is_safe = True
+
+    def say(self, message=None, nl=True, file=None, *args, flush=False, **kwargs):
+        click_echo(message, file=self.echo_buffer, nl=nl, *args, **kwargs)
+        if flush:
+            self.flush()
+
+    def ask(self, text, default=None, hide_input=False, *args, **kwargs):
+        if hide_input:
+            self.ensure_safe()
+        return click_prompt(text, default, hide_input, *args, **kwargs)
+
+    def get_reply(self, prompt):
+        self.say(prompt, nl=False, flush=True)
+        return self.wait_for_message()
+
+    def flush(self):
+        content = self.echo_buffer.getvalue()
+        self.echo_buffer = StringIO()
+        if not content.strip():
+            return
+
+        smalld, channel_id = self.runner.smalld, self.channel_id
+        smalld.post(f"/channels/{channel_id}/messages", {"content": content})
+
+    def wait_for_message(self):
+        handle = self.runner.add_pending(self.user_id, self.channel_id)
+        if handle.wait(self.timeout):
+            self.message = handle.result
+            return handle.result["content"]
+        else:
+            self.runner.remove_pending(self.user_id, self.channel_id)
+            raise TimeoutError("timed out while waiting for user response")
+
+    def close(self):
+        self.__exit__(None, None, None)
+        get_current_context().abort()
+
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        self.flush()
 
 
 def get_runner_context():
@@ -45,7 +100,10 @@ class SmallDCliRunner:
 
     def on_message(self, msg):
         content = msg["content"]
-        handle = self.conversations.pop((msg["author"]["id"], msg["channel_id"]), None)
+        user_id = msg["author"]["id"]
+        channel_id = msg["channel_id"]
+
+        handle = self.remove_pending(user_id, channel_id)
         if handle is not None:
             handle.complete_with(msg)
             return
@@ -57,7 +115,7 @@ class SmallDCliRunner:
         return self.executor.submit(self.handle_command, msg, args)
 
     def handle_command(self, msg, args):
-        parent_ctx = click.Context(self.cli, obj=SmallDCliRunnerContext(self, msg))
+        parent_ctx = click.Context(self.cli, obj=SmallDCliRunnerContext(self, msg, self.timeout))
 
         with parent_ctx, managed_click_execution() as manager:
             ctx = self.cli.make_context(self.cli.name, args, parent=parent_ctx)
@@ -65,16 +123,13 @@ class SmallDCliRunner:
             self.cli.invoke(ctx)
             echo(flush=True, nl=False)
 
-    def wait_for_message(self, author_id, channel_id):
+    def add_pending(self, user_id, channel_id):
         handle = Completable()
-        self.conversations[(author_id, channel_id)] = handle
+        self.conversations[(user_id, channel_id)] = handle
+        return handle
 
-        if handle.wait(self.timeout):
-            get_runner_context().message = handle.result
-            return handle.result["content"]
-        else:
-            self.conversations.pop((author_id, channel_id), None)
-            raise TimeoutError("timed out while waiting for user response")
+    def remove_pending(self, user_id, channel_id):
+        return self.conversations.pop((user_id, channel_id), None)
 
 
 def parse_command(prefix, command):
@@ -121,43 +176,16 @@ class Completable:
             return self._result
 
 
-def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
-    ctx = get_runner_context()
-
-    click_echo(message, file=ctx.echo_buffer, nl=nl, *args, **kwargs)
-    if not flush:
-        return
-
-    content = ctx.echo_buffer.getvalue()
-    if not content.strip():
-        return
-    ctx.echo_buffer = StringIO()
-
-    smalld, channel_id = ctx.runner.smalld, ctx.channel_id
-    smalld.post(f"/channels/{channel_id}/messages", {"content": content})
+def echo(*args, **kwargs):
+    return get_runner_context().say(*args, **kwargs)
 
 
-def prompt(text, default=None, hide_input=False, *args, **kwargs):
-    ctx = get_runner_context()
-
-    if hide_input and not ctx.is_safe:
-        author_id = ctx.message["author"]["id"]
-        channel = ctx.runner.smalld.post(
-            "/users/@me/channels", {"recipient_id": author_id}
-        )
-        ctx.channel_id = channel["id"]
-        ctx.is_safe = True
-
-    return click_prompt(text, default, hide_input, *args, **kwargs)
+def prompt(*args, **kwargs):
+    return get_runner_context().ask(*args, **kwargs)
 
 
-def prompt_func(prompt="", *args, **kwargs):
-    echo(prompt, nl=False, flush=True)
-
-    ctx = get_runner_context()
-    author_id = ctx.message["author"]["id"]
-    return ctx.runner.wait_for_message(author_id, ctx.channel_id)
-
+def prompt_func(prompt):
+    return get_runner_context().get_reply(prompt)
 
 click_echo = click.echo
 click_prompt = click.prompt
