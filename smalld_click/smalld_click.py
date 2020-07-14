@@ -7,7 +7,7 @@ import click
 from pkg_resources import get_distribution
 
 from .conversation import Conversation
-from .utils import Completable
+from .utils import Completable, patch_click_functions, restore_click_functions
 
 __version__ = get_distribution("smalld-click").version
 
@@ -25,10 +25,12 @@ class SmallDCliRunner:
         self.executor = executor if executor is not None else ThreadPoolExecutor()
 
     def __enter__(self):
+        patch_click_functions()
         self.smalld.on_message_create()(self.on_message)
         return self
 
     def __exit__(self, *args):
+        restore_click_functions()
         self.executor.__exit__(*args)
 
     def on_message(self, msg):

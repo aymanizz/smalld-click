@@ -37,19 +37,39 @@ def prompt_func(prompt):
     return get_conversation().get_reply(prompt)
 
 
-click_echo = click.echo
 click_prompt = click.prompt
+click_echo = click.echo
+click_visible_prompt_func = click.termui.visible_prompt_func
+click_hidden_prompt_func = click.termui.hidden_prompt_func
 
-click.echo = echo
-click.core.echo = echo
-click.utils.echo = echo
-click.termui.echo = echo
-click.decorators.echo = echo
-click.exceptions.echo = echo
 
-click.prompt = prompt
-click.termui.prompt = prompt
-click.core.prompt = prompt
+echo_objects = (
+    click,
+    click.core,
+    click.utils,
+    click.termui,
+    click.decorators,
+    click.exceptions,
+)
+prompt_objects = (click, click.core, click.termui)
 
-click.termui.visible_prompt_func = prompt_func
-click.termui.hidden_prompt_func = prompt_func
+
+def set_click_functions(echo, prompt, visible_prompt, hidden_prompt):
+    for obj in echo_objects:
+        obj.echo = echo
+
+    for obj in prompt_objects:
+        obj.prompt = prompt
+
+    click.termui.visible_prompt_func = visible_prompt
+    click.termui.hidden_prompt_func = hidden_prompt
+
+
+def patch_click_functions():
+    set_click_functions(echo, prompt, prompt_func, prompt_func)
+
+
+def restore_click_functions():
+    set_click_functions(
+        click_echo, click_prompt, click_visible_prompt_func, click_hidden_prompt_func
+    )

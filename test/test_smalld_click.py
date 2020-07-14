@@ -233,3 +233,21 @@ def test_continues_conversation_in_DM_after_hidden_prompt(subject, smalld):
             call(POST_DM_MESSAGE_ROUTE, {"content": "echo 2\n"}),
         ]
     )
+
+
+def test_patches_click_functions_in_context_only(smalld):
+    from smalld_click.utils import echo, prompt, click_echo, click_prompt
+
+    # sanity checks
+    assert echo is not click_echo
+    assert prompt is not click_prompt
+
+    assert click.echo is click_echo
+    assert click.prompt is click_prompt
+
+    with SmallDCliRunner(smalld, None):
+        assert click.echo is echo
+        assert click.prompt is prompt
+
+    assert click.echo is click_echo
+    assert click.prompt is click_prompt
