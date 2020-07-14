@@ -74,20 +74,19 @@ The `SmallDCliRunner` is the core class for running CLI applications.
 Instances of this class should be used as a context manager, to properly close the executor when the bot stops.
 
 ```python
-SmallDCliRunnerContext(runner, message)
+Conversation(runner, message)
 ```
 
-The context for this command invocation, holds the runner instance, and the message payload that triggered the
-execution of this command.
+Represents the the state of the command invocation. Holds the runner instance, and the message payload.
+Also manages the interactions between the user and the CLI application.
 
 After each prompt, the message is updated to the latest message sent by the user.
 
 ```python
-get_runner_context()
+get_conversation()
 ```
 
-Returns the current runner context. Must only be invoked inside of a command handler.
-This is similar to Click's `get_current_context()`
+Returns the current conversation. Must only be invoked inside of a command handler.
 
 ### Patched functionality
 

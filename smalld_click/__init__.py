@@ -1,1 +1,2 @@
-from .smalld_click import SmallDCliRunner, __version__, get_runner_context, logger
+from .conversation import Conversation, get_conversation
+from .smalld_click import SmallDCliRunner, __version__, logger
