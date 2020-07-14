@@ -71,7 +71,8 @@ The `SmallDCliRunner` is the core class for running CLI applications.
 - `executor` an instance of `concurrent.futures.Executor` used to execute commands. by default
     this is a `concurrent.futures.ThreadPoolExecutor`.
 
-Instances of this class should be used as a context manager, to properly close the executor when the bot stops.
+Instances of this class should be used as a context manager, to patch click functions and to properly close
+the executor when the bot stops.
 
 ```python
 Conversation(runner, message)
