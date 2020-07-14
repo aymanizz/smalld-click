@@ -251,3 +251,21 @@ def test_patches_click_functions_in_context_only(smalld):
 
     assert click.echo is click_echo
     assert click.prompt is click_prompt
+
+
+def test_sends_chunked_messages_not_exceeding_message_length_limit(subject, smalld):
+    @click.command()
+    def command():
+        click.echo("a" * 3000)
+
+    subject.cli = command
+
+    subject.on_message(make_message("command"))
+
+    assert smalld.post.call_count == 2
+    smalld.post.assert_has_calls(
+        [
+            call(POST_MESSAGE_ROUTE, {"content": "a" * 2000}),
+            call(POST_MESSAGE_ROUTE, {"content": "a" * 1000 + "\n"}),
+        ]
+    )
