@@ -6,6 +6,9 @@ click_prompt = click.prompt
 click_echo = click.echo
 
 
+MESSAGE_CHARACTERS_LIMIT = 2000
+
+
 class Conversation:
     def __init__(self, runner, message, timeout):
         self.runner = runner
@@ -44,11 +47,11 @@ class Conversation:
     def flush(self):
         content = self.echo_buffer.getvalue()
         self.echo_buffer = io.StringIO()
-        if not content.strip():
-            return
 
         smalld, channel_id = self.runner.smalld, self.channel_id
-        smalld.post(f"/channels/{channel_id}/messages", {"content": content})
+        for message in chunked(content, MESSAGE_CHARACTERS_LIMIT):
+            if message.strip():
+                smalld.post(f"/channels/{channel_id}/messages", {"content": message})
 
     def wait_for_message(self):
         handle = self.runner.add_listener(self.user_id, self.channel_id)
@@ -72,3 +75,8 @@ class Conversation:
 
 def get_conversation():
     return click.get_current_context().find_object(Conversation)
+
+
+def chunked(it, n):
+    for i in range(0, len(it), n):
+        yield it[i : i + n]
