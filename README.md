@@ -97,8 +97,8 @@ prompts that are hidden, using `hide_input=True`, are sent to the user DM, and c
 
 Note that, echo and prompt will send a message in the same channel as the message that triggered the command invocation.
 
-Calls to echo are buffered. When the buffer is flushed. its content is sent in 2K chunks (limit set by discord.)
-The buffer can is flushed automatically when there is a prompt or the command finishes execution or the content
+Calls to echo are buffered. When the buffer is flushed, its content is sent in 2K chunks (limit set by discord.)
+The buffer can be flushed automatically when there is a prompt, or the command finishes execution, or the content
 in the buffer exceeds the 2K limit.
 
 It's also possible to flush the buffer by passing `flush=True` to `click.echo` call.
