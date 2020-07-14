@@ -80,6 +80,8 @@ SmallDCliRunnerContext(runner, message)
 The context for this command invocation, holds the runner instance, and the message payload that triggered the
 execution of this command.
 
+After each prompt, the message is updated to the latest message sent by the user.
+
 ```python
 get_runner_context()
 ```
@@ -89,8 +91,9 @@ This is similar to Click's `get_current_context()`
 
 ### Patched functionality
 
-You can use `click.echo`, and `click.prompt` directly to send/wait for messages. However, hidden prompts are not
-supported yet and shouldn't be used.
+You can use `click.echo`, and `click.prompt` directly to send/wait for messages.
+
+prompts that are hidden, using `hide_input=True`, are sent to the user DM, and cause the conversation to continue there.
 
 Note that, echo and prompt will send a message in the same channel as the message that triggered the command invocation.
 

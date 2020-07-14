@@ -18,8 +18,9 @@ class SmallDCliRunnerContext:
     def __init__(self, runner, message):
         self.runner = runner
         self.message = message
+        self.channel_id = message["channel_id"]
         self.echo_buffer = StringIO()
-        self.buffered = True
+        self.is_safe = False
 
 
 def get_runner_context():
@@ -46,7 +47,7 @@ class SmallDCliRunner:
         content = msg["content"]
         handle = self.conversations.pop((msg["author"]["id"], msg["channel_id"]), None)
         if handle is not None:
-            handle.complete_with(content)
+            handle.complete_with(msg)
             return
 
         name, args = parse_command(self.prefix, content)
@@ -64,14 +65,13 @@ class SmallDCliRunner:
             self.cli.invoke(ctx)
             echo(flush=True, nl=False)
 
-    def wait_for_message(self, msg):
+    def wait_for_message(self, author_id, channel_id):
         handle = Completable()
-        author_id = msg["author"]["id"]
-        channel_id = msg["channel_id"]
         self.conversations[(author_id, channel_id)] = handle
 
         if handle.wait(self.timeout):
-            return handle.result
+            get_runner_context().message = handle.result
+            return handle.result["content"]
         else:
             self.conversations.pop((author_id, channel_id), None)
             raise TimeoutError("timed out while waiting for user response")
@@ -125,7 +125,7 @@ def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
     ctx = get_runner_context()
 
     click_echo(message, file=ctx.echo_buffer, nl=nl, *args, **kwargs)
-    if ctx.buffered and not flush:
+    if not flush:
         return
 
     content = ctx.echo_buffer.getvalue()
@@ -133,26 +133,30 @@ def echo(message=None, nl=True, file=None, *args, flush=False, **kwargs):
         return
     ctx.echo_buffer = StringIO()
 
-    smalld, msg = ctx.runner.smalld, ctx.message
-    smalld.post(f"/channels/{msg['channel_id']}/messages", {"content": content})
+    smalld, channel_id = ctx.runner.smalld, ctx.channel_id
+    smalld.post(f"/channels/{channel_id}/messages", {"content": content})
 
 
-def prompt(*args, **kwargs):
+def prompt(text, default=None, hide_input=False, *args, **kwargs):
     ctx = get_runner_context()
 
-    ctx.buffered = False
-    result = click_prompt(*args, **kwargs)
-    ctx.buffered = True
-    return result
+    if hide_input and not ctx.is_safe:
+        author_id = ctx.message["author"]["id"]
+        channel = ctx.runner.smalld.post(
+            "/users/@me/channels", {"recipient_id": author_id}
+        )
+        ctx.channel_id = channel["id"]
+        ctx.is_safe = True
+
+    return click_prompt(text, default, hide_input, *args, **kwargs)
 
 
-def visible_prompt(prompt="", *args, **kwargs):
+def prompt_func(prompt="", *args, **kwargs):
+    echo(prompt, nl=False, flush=True)
+
     ctx = get_runner_context()
-    runner, msg = ctx.runner, ctx.message
-
-    if prompt:
-        echo(prompt, flush=True)
-    return runner.wait_for_message(msg)
+    author_id = ctx.message["author"]["id"]
+    return ctx.runner.wait_for_message(author_id, ctx.channel_id)
 
 
 click_echo = click.echo
@@ -169,4 +173,5 @@ click.prompt = prompt
 click.termui.prompt = prompt
 click.core.prompt = prompt
 
-click.termui.visible_prompt_func = visible_prompt
+click.termui.visible_prompt_func = prompt_func
+click.termui.hidden_prompt_func = prompt_func
