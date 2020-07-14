@@ -5,7 +5,7 @@ from unittest.mock import Mock, call
 import click
 
 import pytest
-from smalld_click.smalld_click import SmallDCliRunner, get_runner_context
+from smalld_click import SmallDCliRunner, get_conversation
 
 AUTHOR_ID = "author_id"
 CHANNEL_ID = "channel_id"
@@ -45,21 +45,21 @@ def subject(smalld):
 
 
 def test_exposes_correct_context(subject):
-    ctx = None
+    conversation = None
 
     @click.command()
     def command():
-        nonlocal ctx
-        ctx = get_runner_context()
+        nonlocal conversation
+        conversation = get_conversation()
 
     subject.cli = command
     data = make_message("command")
     f = subject.on_message(data)
 
     assert_completes(f)
-    assert ctx is not None
-    assert ctx.runner is subject
-    assert ctx.message is data
+    assert conversation is not None
+    assert conversation.runner is subject
+    assert conversation.message is data
 
 
 def test_parses_command(subject):
@@ -176,7 +176,7 @@ def test_drops_conversation_when_timed_out(subject):
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
-    assert not subject.conversations
+    assert not subject.listeners
 
 
 def test_prompts_in_DM_for_hidden_prompts(subject, smalld):
