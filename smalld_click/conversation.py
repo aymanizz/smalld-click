@@ -15,6 +15,7 @@ class Conversation:
         self.smalld = runner.smalld
         self.message = message
         self.timeout = timeout
+        self.fixed_width = runner.fixed_width
         self.channel_id = message["channel_id"]
         self.user_id = message["author"]["id"]
         self.echo_buffer = io.StringIO()
@@ -51,6 +52,8 @@ class Conversation:
         smalld, channel_id = self.runner.smalld, self.channel_id
         for message in chunked(content, MESSAGE_CHARACTERS_LIMIT):
             if message.strip():
+                if self.fixed_width:
+                    message = make_fixed_width(message)
                 smalld.post(f"/channels/{channel_id}/messages", {"content": message})
 
     def wait_for_message(self):
@@ -80,3 +83,7 @@ def get_conversation():
 def chunked(it, n):
     for i in range(0, len(it), n):
         yield it[i : i + n]
+
+
+def make_fixed_width(text):
+    return f"```\n{text}\n```"

@@ -16,13 +16,14 @@ logger = logging.getLogger("smalld_click")
 
 
 class SmallDCliRunner:
-    def __init__(self, smalld, cli, prefix="", timeout=60, executor=None):
+    def __init__(self, smalld, cli, prefix="", timeout=60, executor=None, fixed_width=False):
         self.smalld = smalld
         self.cli = cli
         self.prefix = prefix
         self.timeout = timeout
         self.listeners = {}
         self.executor = executor if executor is not None else ThreadPoolExecutor()
+        self.fixed_width = fixed_width
 
     def __enter__(self):
         patch_click_functions()
