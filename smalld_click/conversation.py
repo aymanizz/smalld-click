@@ -10,12 +10,10 @@ MESSAGE_CHARACTERS_LIMIT = 2000
 
 
 class Conversation:
-    def __init__(self, runner, message, timeout):
+    def __init__(self, runner, message):
         self.runner = runner
-        self.smalld = runner.smalld
         self.message = message
-        self.timeout = timeout
-        self.fixed_width = runner.fixed_width
+        self.smalld = runner.smalld
         self.channel_id = message["channel_id"]
         self.user_id = message["author"]["id"]
         self.echo_buffer = io.StringIO()
@@ -52,13 +50,13 @@ class Conversation:
         smalld, channel_id = self.runner.smalld, self.channel_id
         for message in chunked(content, MESSAGE_CHARACTERS_LIMIT):
             if message.strip():
-                if self.fixed_width:
-                    message = make_fixed_width(message)
-                smalld.post(f"/channels/{channel_id}/messages", {"content": message})
+                smalld.post(
+                    f"/channels/{channel_id}/messages", self.runner.create_message(message)
+                )
 
     def wait_for_message(self):
         handle = self.runner.add_listener(self.user_id, self.channel_id)
-        if handle.wait(self.timeout):
+        if handle.wait(self.runner.timeout):
             self.message = handle.result
             return handle.result["content"]
         else:
@@ -83,7 +81,3 @@ def get_conversation():
 def chunked(it, n):
     for i in range(0, len(it), n):
         yield it[i : i + n]
-
-
-def make_fixed_width(text):
-    return f"```\n{text}\n```"
