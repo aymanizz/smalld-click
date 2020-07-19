@@ -176,7 +176,7 @@ def test_drops_conversation_when_timed_out(subject):
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
-    assert not subject.listeners
+    assert not subject.pending
 
 
 def test_prompts_in_DM_for_hidden_prompts(subject, smalld):

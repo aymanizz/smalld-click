@@ -25,7 +25,7 @@ class SmallDCliRunner:
         self.timeout = timeout
         self.create_message = create_message if create_message else plain_message
         self.executor = executor if executor else ThreadPoolExecutor()
-        self.listeners = {}
+        self.pending = {}
 
     def __enter__(self):
         patch_click_functions()
@@ -41,7 +41,7 @@ class SmallDCliRunner:
         user_id = msg["author"]["id"]
         channel_id = msg["channel_id"]
 
-        handle = self.remove_listener(user_id, channel_id)
+        handle = self.pending.pop((user_id, channel_id), None)
         if handle is not None:
             handle.complete_with(msg)
             return
@@ -65,13 +65,15 @@ class SmallDCliRunner:
 
             self.cli.invoke(ctx)
 
-    def add_listener(self, user_id, channel_id):
+    def wait_for_message(self, user_id, channel_id):
         handle = Completable()
-        self.listeners[(user_id, channel_id)] = handle
-        return handle
-
-    def remove_listener(self, user_id, channel_id):
-        return self.listeners.pop((user_id, channel_id), None)
+        self.pending[(user_id, channel_id)] = handle
+        if handle.wait(self.timeout):
+            self.message = handle.result
+            return handle.result["content"]
+        else:
+            self.pending.pop((user_id, channel_id), None)
+            raise TimeoutError("timed out while waiting for user response")
 
 
 def plain_message(msg):
