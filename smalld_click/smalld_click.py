@@ -16,13 +16,16 @@ logger = logging.getLogger("smalld_click")
 
 
 class SmallDCliRunner:
-    def __init__(self, smalld, cli, prefix="", timeout=60, executor=None):
+    def __init__(
+        self, smalld, cli, prefix="", timeout=60, create_message=None, executor=None,
+    ):
         self.smalld = smalld
         self.cli = cli
         self.prefix = prefix
         self.timeout = timeout
+        self.create_message = create_message if create_message else plain_message
+        self.executor = executor if executor else ThreadPoolExecutor()
         self.listeners = {}
-        self.executor = executor if executor is not None else ThreadPoolExecutor()
 
     def __enter__(self):
         patch_click_functions()
@@ -51,7 +54,7 @@ class SmallDCliRunner:
 
     def handle_command(self, msg, args):
         with managed_click_execution() as manager:
-            conversation = Conversation(self, msg, self.timeout)
+            conversation = Conversation(self, msg)
             parent_ctx = click.Context(self.cli, obj=conversation)
 
             manager.enter_context(parent_ctx)
@@ -69,6 +72,10 @@ class SmallDCliRunner:
 
     def remove_listener(self, user_id, channel_id):
         return self.listeners.pop((user_id, channel_id), None)
+
+
+def plain_message(msg):
+    return {"content": msg}
 
 
 def parse_command(prefix, command):
