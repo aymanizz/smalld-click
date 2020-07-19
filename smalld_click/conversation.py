@@ -47,12 +47,10 @@ class Conversation:
         content = self.echo_buffer.getvalue()
         self.echo_buffer = io.StringIO()
 
-        smalld, channel_id = self.runner.smalld, self.channel_id
         for message in chunked(content, MESSAGE_CHARACTERS_LIMIT):
             if message.strip():
-                smalld.post(
-                    f"/channels/{channel_id}/messages", self.runner.create_message(message)
-                )
+                message = self.runner.create_message(message)
+                self.smalld.post(f"/channels/{self.channel_id}/messages", message)
 
     def wait_for_message(self):
         handle = self.runner.add_listener(self.user_id, self.channel_id)

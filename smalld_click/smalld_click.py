@@ -2,10 +2,8 @@ import contextlib
 import logging
 import shlex
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 
 import click
-from smalld import SmallD
 from pkg_resources import get_distribution
 
 from .conversation import Conversation
@@ -19,13 +17,7 @@ logger = logging.getLogger("smalld_click")
 
 class SmallDCliRunner:
     def __init__(
-        self,
-        smalld,
-        cli,
-        prefix="",
-        timeout=60,
-        create_message=None,
-        executor=None,
+        self, smalld, cli, prefix="", timeout=60, create_message=None, executor=None,
     ):
         self.smalld = smalld
         self.cli = cli
