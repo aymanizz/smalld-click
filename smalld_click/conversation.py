@@ -41,7 +41,8 @@ class Conversation:
 
     def get_reply(self, prompt):
         self.say(prompt, nl=False, flush=True)
-        return self.runner.wait_for_message(self.user_id, self.channel_id)
+        self.message = self.runner.wait_for_message(self.user_id, self.channel_id)
+        return self.message["content"]
 
     def flush(self):
         content = self.echo_buffer.getvalue()

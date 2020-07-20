@@ -69,8 +69,7 @@ class SmallDCliRunner:
         handle = Completable()
         self.pending[(user_id, channel_id)] = handle
         if handle.wait(self.timeout):
-            self.message = handle.result
-            return handle.result["content"]
+            return handle.result
         else:
             self.pending.pop((user_id, channel_id), None)
             raise TimeoutError("timed out while waiting for user response")

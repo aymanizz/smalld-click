@@ -269,3 +269,26 @@ def test_sends_chunked_messages_not_exceeding_message_length_limit(subject, smal
             call(POST_MESSAGE_ROUTE, {"content": "a" * 1000 + "\n"}),
         ]
     )
+
+
+def test_message_is_latest_message_payload(subject):
+    msg1, msg2 = None, None
+
+    @click.command()
+    def command():
+        nonlocal msg1, msg2
+        conv = get_conversation()
+        msg1 = conv.message
+        click.prompt("prompt")
+        msg2 = conv.message
+
+    subject.cli = command
+
+    f = subject.on_message(make_message("command"))
+    time.sleep(0.2)
+    subject.on_message(make_message("result"))
+
+    assert_completes(f)
+    assert msg1 is not msg2
+    assert msg1["content"] == "command"
+    assert msg2["content"] == "result"
