@@ -41,7 +41,8 @@ class Conversation:
 
     def get_reply(self, prompt):
         self.say(prompt, nl=False, flush=True)
-        return self.wait_for_message()
+        self.message = self.runner.wait_for_message(self.user_id, self.channel_id)
+        return self.message["content"]
 
     def flush(self):
         content = self.echo_buffer.getvalue()
@@ -51,15 +52,6 @@ class Conversation:
             if message.strip():
                 message = self.runner.create_message(message)
                 self.smalld.post(f"/channels/{self.channel_id}/messages", message)
-
-    def wait_for_message(self):
-        handle = self.runner.add_listener(self.user_id, self.channel_id)
-        if handle.wait(self.runner.timeout):
-            self.message = handle.result
-            return handle.result["content"]
-        else:
-            self.runner.remove_listener(self.user_id, self.channel_id)
-            raise TimeoutError("timed out while waiting for user response")
 
     def close(self):
         self.__exit__(None, None, None)
