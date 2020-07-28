@@ -17,13 +17,13 @@ logger = logging.getLogger("smalld_click")
 
 class SmallDCliRunner:
     def __init__(
-        self, smalld, cli, prefix="", timeout=60, create_message=None, executor=None,
+        self, smalld, cli, name=None, timeout=60, create_message=None, executor=None,
     ):
         self.smalld = smalld
         self.cli = cli
-        self.prefix = prefix + (self.cli.name or "")
-        self.timeout = timeout
+        self.name = name or self.cli.name or ""
         self.create_message = create_message if create_message else plain_message
+        self.timeout = timeout
         self.executor = executor if executor else ThreadPoolExecutor()
         self.pending = {}
 
@@ -46,9 +46,9 @@ class SmallDCliRunner:
             handle.complete_with(msg)
             return
 
-        if not content.startswith(self.prefix):
+        if not content.startswith(self.name):
             return
-        command = content[len(self.prefix) :].lstrip()
+        command = content[len(self.name) :].lstrip()
 
         return self.executor.submit(self.handle_command, msg, command)
 
@@ -65,7 +65,7 @@ class SmallDCliRunner:
             except ValueError as e:
                 parent_ctx.fail(e.args[0])
 
-            ctx = self.cli.make_context(self.cli.name, args, parent=parent_ctx)
+            ctx = self.cli.make_context(self.name, args, parent=parent_ctx)
             manager.enter_context(ctx)
 
             self.cli.invoke(ctx)
