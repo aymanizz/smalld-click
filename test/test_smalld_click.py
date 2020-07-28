@@ -1,7 +1,7 @@
 import time
 from concurrent import futures
-from unittest.mock import Mock, call
 from functools import partial
+from unittest.mock import Mock, call
 
 import click
 
@@ -21,9 +21,14 @@ def make_message(content, author_id=AUTHOR_ID, channel_id=CHANNEL_ID):
     return {"content": content, "channel_id": channel_id, "author": {"id": author_id}}
 
 
-def assert_completes(future, timeout=0.5):
-    done, _ = futures.wait([future], timeout)
-    if future not in done:
+def assert_completes(future_or_futures, timeout=0.5):
+    futures_list = (
+        future_or_futures
+        if hasattr(future_or_futures, "__iter__")
+        else [future_or_futures]
+    )
+    done, _ = futures.wait(futures_list, timeout)
+    if any(future not in done for future in futures_list):
         raise AssertionError("timed out waiting for future to complete")
 
 
@@ -46,6 +51,7 @@ def make_subject(request, smalld):
         subject = SmallDCliRunner(smalld, *args, **kwargs).__enter__()
         request.addfinalizer(partial(subject.__exit__, None, None, None))
         return subject
+
     return factory
 
 
@@ -83,6 +89,33 @@ def test_parses_command(make_subject):
     assert_completes(f)
     assert argument == "argument"
     assert option == "option"
+
+
+def test_parses_multicommands(make_subject):
+    slots = [False, False]
+
+    @click.group()
+    def cli():
+        pass
+
+    def create_command(slot):
+        @cli.command(name=f"cmd{slot}")
+        @click.option("--opt", is_flag=True)
+        def cmd(opt):
+            nonlocal slots
+            if opt:
+                slots[slot] = True
+
+    create_command(0)
+    create_command(1)
+
+    cli_collection = click.CommandCollection(sources=[cli])
+    subject = make_subject(cli_collection)
+
+    f1 = subject.on_message(make_message("cmd0 --opt"))
+    f2 = subject.on_message(make_message("cmd1 --opt"))
+    assert_completes([f1, f2])
+    assert all(slots)
 
 
 def test_handles_echo(make_subject, smalld):
@@ -259,7 +292,9 @@ def test_patches_click_functions_in_context_only(smalld):
     assert click.prompt is click_prompt
 
 
-def test_sends_chunked_messages_not_exceeding_message_length_limit(make_subject, smalld):
+def test_sends_chunked_messages_not_exceeding_message_length_limit(
+    make_subject, smalld
+):
     @click.command()
     def command():
         click.echo("a" * 3000)
