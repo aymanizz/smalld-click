@@ -1,6 +1,7 @@
 import time
 from concurrent import futures
 from unittest.mock import Mock, call
+from functools import partial
 
 import click
 
@@ -39,12 +40,16 @@ def smalld():
 
 
 @pytest.fixture
-def subject(smalld):
-    with SmallDCliRunner(smalld, None, timeout=1) as subject:
-        yield subject
+def make_subject(request, smalld):
+    def factory(*args, **kwargs):
+        kwargs.setdefault("timeout", 1)
+        subject = SmallDCliRunner(smalld, *args, **kwargs).__enter__()
+        request.addfinalizer(partial(subject.__exit__, None, None, None))
+        return subject
+    return factory
 
 
-def test_exposes_correct_context(subject):
+def test_exposes_correct_context(make_subject):
     conversation = None
 
     @click.command()
@@ -52,7 +57,7 @@ def test_exposes_correct_context(subject):
         nonlocal conversation
         conversation = get_conversation()
 
-    subject.cli = command
+    subject = make_subject(command)
     data = make_message("command")
     f = subject.on_message(data)
 
@@ -62,7 +67,7 @@ def test_exposes_correct_context(subject):
     assert conversation.message is data
 
 
-def test_parses_command(subject):
+def test_parses_command(make_subject):
     argument, option = None, None
 
     @click.command()
@@ -72,7 +77,7 @@ def test_parses_command(subject):
         nonlocal argument, option
         argument, option = arg, opt
 
-    subject.cli = command
+    subject = make_subject(command)
     f = subject.on_message(make_message("command argument --opt=option"))
 
     assert_completes(f)
@@ -80,25 +85,25 @@ def test_parses_command(subject):
     assert option == "option"
 
 
-def test_handles_echo(subject, smalld):
+def test_handles_echo(make_subject, smalld):
     @click.command()
     def command():
         click.echo("echo")
 
-    subject.cli = command
+    subject = make_subject(command)
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
     smalld.post.assert_called_once_with(POST_MESSAGE_ROUTE, {"content": "echo\n"})
 
 
-def test_buffers_calls_to_echo(subject, smalld):
+def test_buffers_calls_to_echo(make_subject, smalld):
     @click.command()
     def command():
         click.echo("echo 1")
         click.echo("echo 2")
 
-    subject.cli = command
+    subject = make_subject(command)
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
@@ -107,19 +112,19 @@ def test_buffers_calls_to_echo(subject, smalld):
     )
 
 
-def test_should_not_send_empty_messages(subject, smalld):
+def test_should_not_send_empty_messages(make_subject, smalld):
     @click.command()
     def command():
         click.echo("  \n\n\n  ")
 
-    subject.cli = command
+    subject = make_subject(command)
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
     assert smalld.post.call_count == 0
 
 
-def test_handles_prompt(subject, smalld):
+def test_handles_prompt(make_subject, smalld):
     result = None
 
     @click.command()
@@ -127,7 +132,7 @@ def test_handles_prompt(subject, smalld):
         nonlocal result
         result = click.prompt("prompt")
 
-    subject.cli = command
+    subject = make_subject(command)
     f = subject.on_message(make_message("command"))
     subject.on_message(make_message("result"))
 
@@ -135,7 +140,7 @@ def test_handles_prompt(subject, smalld):
     smalld.post.assert_called_once_with(POST_MESSAGE_ROUTE, {"content": "prompt: "})
 
 
-def test_sends_prompts_without_buffering(subject, smalld):
+def test_sends_prompts_without_buffering(make_subject, smalld):
     result1, result2 = None, None
 
     @click.command()
@@ -146,7 +151,7 @@ def test_sends_prompts_without_buffering(subject, smalld):
         result2 = click.prompt("prompt 2")
         click.echo("echo 2")
 
-    subject.cli = command
+    subject = make_subject(command)
 
     f = subject.on_message(make_message("command"))
     time.sleep(0.2)
@@ -165,34 +170,31 @@ def test_sends_prompts_without_buffering(subject, smalld):
     assert result1 == result2 == "result"
 
 
-def test_drops_conversation_when_timed_out(subject):
+def test_drops_conversation_when_timed_out(make_subject):
     @click.command()
     def command():
         click.prompt("prompt")
 
-    subject.cli = command
-    subject.timeout = 0.2
-
+    subject = make_subject(command, timeout=0.2)
     f = subject.on_message(make_message("command"))
 
     assert_completes(f)
     assert not subject.pending
 
 
-def test_prompts_in_DM_for_hidden_prompts(subject, smalld):
+def test_prompts_in_DM_for_hidden_prompts(make_subject, smalld):
     @click.command()
     def command():
         click.prompt("prompt", hide_input=True)
 
-    subject.cli = command
-
+    subject = make_subject(command)
     subject.on_message(make_message("command"))
     time.sleep(0.2)
 
     assert smalld.post.called_with(POST_DM_MESSAGE_ROUTE, {"content": "prompt: "})
 
 
-def test_only_responds_to_hidden_prompts_answers_in_DM(subject, smalld):
+def test_only_responds_to_hidden_prompts_answers_in_DM(make_subject, smalld):
     result = None
 
     @click.command()
@@ -200,7 +202,7 @@ def test_only_responds_to_hidden_prompts_answers_in_DM(subject, smalld):
         nonlocal result
         result = click.prompt("prompt", hide_input=True)
 
-    subject.cli = command
+    subject = make_subject(command)
 
     f = subject.on_message(make_message("command"))
     time.sleep(0.2)
@@ -211,14 +213,14 @@ def test_only_responds_to_hidden_prompts_answers_in_DM(subject, smalld):
     assert result == "hidden result"
 
 
-def test_continues_conversation_in_DM_after_hidden_prompt(subject, smalld):
+def test_continues_conversation_in_DM_after_hidden_prompt(make_subject, smalld):
     @click.command()
     def command():
         click.echo("echo 1")
         click.prompt("prompt", hide_input=True)
         click.echo("echo 2")
 
-    subject.cli = command
+    subject = make_subject(command)
 
     f = subject.on_message(make_message("command"))
     time.sleep(0.2)
@@ -245,7 +247,11 @@ def test_patches_click_functions_in_context_only(smalld):
     assert click.echo is click_echo
     assert click.prompt is click_prompt
 
-    with SmallDCliRunner(smalld, None):
+    @click.command()
+    def command():
+        pass
+
+    with SmallDCliRunner(smalld, command):
         assert click.echo is echo
         assert click.prompt is prompt
 
@@ -253,13 +259,12 @@ def test_patches_click_functions_in_context_only(smalld):
     assert click.prompt is click_prompt
 
 
-def test_sends_chunked_messages_not_exceeding_message_length_limit(subject, smalld):
+def test_sends_chunked_messages_not_exceeding_message_length_limit(make_subject, smalld):
     @click.command()
     def command():
         click.echo("a" * 3000)
 
-    subject.cli = command
-
+    subject = make_subject(command)
     subject.on_message(make_message("command"))
 
     assert smalld.post.call_count == 2
@@ -271,7 +276,7 @@ def test_sends_chunked_messages_not_exceeding_message_length_limit(subject, smal
     )
 
 
-def test_message_is_latest_message_payload(subject):
+def test_message_is_latest_message_payload(make_subject):
     msg1, msg2 = None, None
 
     @click.command()
@@ -282,7 +287,7 @@ def test_message_is_latest_message_payload(subject):
         click.prompt("prompt")
         msg2 = conv.message
 
-    subject.cli = command
+    subject = make_subject(command)
 
     f = subject.on_message(make_message("command"))
     time.sleep(0.2)
