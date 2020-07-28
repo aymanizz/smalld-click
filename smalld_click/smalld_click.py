@@ -21,7 +21,7 @@ class SmallDCliRunner:
     ):
         self.smalld = smalld
         self.cli = cli
-        self.prefix = prefix
+        self.prefix = prefix + (self.cli.name or "")
         self.timeout = timeout
         self.create_message = create_message if create_message else plain_message
         self.executor = executor if executor else ThreadPoolExecutor()
@@ -46,19 +46,24 @@ class SmallDCliRunner:
             handle.complete_with(msg)
             return
 
-        name, args = parse_command(self.prefix, content)
-        if name != self.cli.name:
+        if not content.startswith(self.prefix):
             return
+        command = content[len(self.prefix) :].lstrip()
 
-        return self.executor.submit(self.handle_command, msg, args)
+        return self.executor.submit(self.handle_command, msg, command)
 
-    def handle_command(self, msg, args):
+    def handle_command(self, msg, command):
         with managed_click_execution() as manager:
             conversation = Conversation(self, msg)
             parent_ctx = click.Context(self.cli, obj=conversation)
 
             manager.enter_context(parent_ctx)
             manager.enter_context(conversation)
+
+            try:
+                args = shlex.split(command)
+            except ValueError as e:
+                parent_ctx.fail(e.args[0])
 
             ctx = self.cli.make_context(self.cli.name, args, parent=parent_ctx)
             manager.enter_context(ctx)
@@ -77,15 +82,6 @@ class SmallDCliRunner:
 
 def plain_message(msg):
     return {"content": msg}
-
-
-def parse_command(prefix, command):
-    cmd = command.strip()[len(prefix) :].lstrip()
-    if not command.startswith(prefix) or not cmd:
-        return None, []
-
-    args = shlex.split(cmd)
-    return args[0], args[1:]
 
 
 @contextlib.contextmanager
