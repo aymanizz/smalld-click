@@ -54,31 +54,25 @@ class SmallDCliRunner:
             handle.complete_with(msg)
             return
 
-        if not content.startswith(self.prefix + self.name):
+        args = parse_command(self.prefix, self.name, content)
+        if args is None:
             return
-        command = content[len(self.prefix) :].lstrip()
 
-        return self.executor.submit(self.handle_command, msg, command)
+        return self.executor.submit(self.handle_command, msg, args)
 
-    def handle_command(self, msg, command):
+    def handle_command(self, msg, args):
+        info_name = self.prefix + self.name
         with managed_click_execution() as manager:
             conversation = Conversation(self, msg)
-            parent_ctx = click.Context(self.cli, obj=conversation)
+            parent_ctx = click.Context(self.cli, info_name=info_name, obj=conversation)
 
             manager.enter_context(parent_ctx)
             manager.enter_context(conversation)
 
-            args, error = parse_command(command)
-            if args is None:
-                return
-
-            ctx = self.cli.make_context(
-                self.prefix + self.name, args or [], parent=parent_ctx
-            )
+            args_list = split_args(args)
+            print(args_list)
+            ctx = self.cli.make_context("", args_list, parent=parent_ctx)
             manager.enter_context(ctx)
-
-            if error:
-                ctx.fail(error)
 
             self.cli.invoke(ctx)
 
@@ -96,21 +90,23 @@ def plain_message(msg):
     return {"content": msg}
 
 
-def parse_command(name, command):
-    if name:
-        name, *rest = command.split(maxsplit=1)
-        if name != name:
-            return None, None
-        command = "".join(rest)
+def parse_command(prefix, name, message):
+    if not message.startswith(prefix):
+        return
+    cmd = message[len(prefix) :].lstrip()
+    if not name:
+        return cmd
+    cmd_name, *rest = cmd.split(maxsplit=1)
+    if cmd_name != name:
+        return
+    return "".join(rest)
 
-    args = None
-    error = None
+
+def split_args(command):
     try:
-        args = shlex.split(command)
+        return shlex.split(command)
     except ValueError as e:
-        error = e.args[0]
-
-    return args, error
+        click.get_current_context().fail(e.args[0])
 
 
 @contextlib.contextmanager
