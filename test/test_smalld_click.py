@@ -118,6 +118,43 @@ def test_parses_multicommands(make_subject):
     assert all(slots)
 
 
+@pytest.mark.parametrize(
+    "prefix, name, message, expected",
+    [
+        ("", "", "command", True),
+        ("++", "", "++command", True),
+        ("++", "invoke", "++invoke command", True),
+        ("++", "", "++  command", True),
+        ("++", "", "++--opt command", True),
+        ("", "invoke", "invokecommand", False),
+        ("", "invoke", "invoke--opt command", False),
+        ("", "invoke", "invoke command", True),
+    ],
+)
+def test_parses_name_and_prefix_correctly(
+    make_subject, prefix, name, message, expected
+):
+    cli_called = False
+    command_called = False
+
+    @click.group()
+    @click.option("--opt", is_flag=True)
+    def cli(opt):
+        nonlocal cli_called
+        cli_called = True
+
+    @cli.command()
+    def command():
+        nonlocal command_called
+        command_called = True
+
+    subject = make_subject(cli, prefix=prefix, name=name)
+    f = subject.on_message(make_message(message))
+
+    assert_completes(f) if expected else time.sleep(0.5)
+    assert cli_called is command_called is expected
+
+
 def test_handles_echo(make_subject, smalld):
     @click.command()
     def command():
