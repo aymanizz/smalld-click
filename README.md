@@ -60,17 +60,21 @@ simply drop the execution of the command.
 ## Guide
 
 ```python
-SmallDCliRunner(smalld, cli, prefix="", timeout=60, create_message=None, executor=None)
+SmallDCliRunner(smalld, cli, prefix="", name=None, timeout=60, create_message=None, executor=None)
 ```
 
 The `SmallDCliRunner` is the core class for running CLI applications.
 
-- `smalld` the SmallD instance for your bot.
-- `prefix` used to determine what messages to consider as invocations of the CLI application.
+- `smalld` the `SmallD` instance for your bot.
+- `cli` a `click.Command` instance to use for running the commands.
+- `prefix` each command invocation must start with this string.
+- `name` the name of the CLI application, defaults to `cli.name`. Can be used to change the command's name,
+    or completely remove it by passing the empty string. Used with the prefix to determine what messages
+    to consider as invocations of the CLI application.
 - `timeout` how long will the bot wait for the user to respond to a prompt in seconds.
 - `create_message` a callback for creating the message payload for discord's create message route.
-    by default, text is sent as is in the content field of the payload.
-- `executor` an instance of `concurrent.futures.Executor` used to execute commands. by default,
+    By default, text is sent as is in the content field of the payload.
+- `executor` an instance of `concurrent.futures.Executor` used to execute commands. By default,
     this is a `concurrent.futures.ThreadPoolExecutor`.
 
 Instances of this class should be used as a context manager, to patch click functions and to properly close
