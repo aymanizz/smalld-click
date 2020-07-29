@@ -17,11 +17,19 @@ logger = logging.getLogger("smalld_click")
 
 class SmallDCliRunner:
     def __init__(
-        self, smalld, cli, prefix="", timeout=60, create_message=None, executor=None,
+        self,
+        smalld,
+        cli,
+        prefix="",
+        name=None,
+        timeout=60,
+        create_message=None,
+        executor=None,
     ):
         self.smalld = smalld
         self.cli = cli
-        self.prefix = prefix + (self.cli.name or "")
+        self.prefix = prefix
+        self.name = name if name is not None else cli.name or ""
         self.timeout = timeout
         self.create_message = create_message if create_message else plain_message
         self.executor = executor if executor else ThreadPoolExecutor()
@@ -46,7 +54,7 @@ class SmallDCliRunner:
             handle.complete_with(msg)
             return
 
-        if not content.startswith(self.prefix):
+        if not content.startswith(self.prefix + self.name):
             return
         command = content[len(self.prefix) :].lstrip()
 
@@ -60,13 +68,17 @@ class SmallDCliRunner:
             manager.enter_context(parent_ctx)
             manager.enter_context(conversation)
 
-            try:
-                args = shlex.split(command)
-            except ValueError as e:
-                parent_ctx.fail(e.args[0])
+            args, error = parse_command(command)
+            if args is None:
+                return
 
-            ctx = self.cli.make_context(self.cli.name, args, parent=parent_ctx)
+            ctx = self.cli.make_context(
+                self.prefix + self.name, args or [], parent=parent_ctx
+            )
             manager.enter_context(ctx)
+
+            if error:
+                ctx.fail(error)
 
             self.cli.invoke(ctx)
 
@@ -82,6 +94,23 @@ class SmallDCliRunner:
 
 def plain_message(msg):
     return {"content": msg}
+
+
+def parse_command(name, command):
+    if name:
+        name, *rest = command.split(maxsplit=1)
+        if name != name:
+            return None, None
+        command = "".join(rest)
+
+    args = None
+    error = None
+    try:
+        args = shlex.split(command)
+    except ValueError as e:
+        error = e.args[0]
+
+    return args, error
 
 
 @contextlib.contextmanager
