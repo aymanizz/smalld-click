@@ -57,6 +57,9 @@ content is sent immediately.
 There is also a timeout for how long the bot will wait for the user's message, if the timeout is exceeded the bot will
 simply drop the execution of the command.
 
+For an example with multiple commands that run under different names (i.e, with no common base command name)
+see the [multicommands bot](examples/multicommands.py).
+
 ## Guide
 
 ```python
