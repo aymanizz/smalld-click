@@ -167,6 +167,7 @@ def test_handles_prompt(make_subject, smalld):
 
     subject = make_subject(command)
     f = subject.on_message(make_message("command"))
+    time.sleep(0.2)
     subject.on_message(make_message("result"))
 
     assert_completes(f)
@@ -300,8 +301,9 @@ def test_sends_chunked_messages_not_exceeding_message_length_limit(
         click.echo("a" * 3000)
 
     subject = make_subject(command)
-    subject.on_message(make_message("command"))
+    f = subject.on_message(make_message("command"))
 
+    assert_completes(f)
     assert smalld.post.call_count == 2
     smalld.post.assert_has_calls(
         [
