@@ -55,6 +55,15 @@ def make_subject(request, smalld):
     return factory
 
 
+def test_raises_error_for_empty_prefix_and_name(make_subject):
+    @click.command()
+    def command():
+        pass
+
+    with pytest.raises(ValueError) as exc_info:
+        make_subject(command, prefix="", name="")
+
+
 def test_exposes_correct_context(make_subject):
     conversation = None
 
@@ -110,10 +119,10 @@ def test_parses_multicommands(make_subject):
     create_command(1)
 
     cli_collection = click.CommandCollection(sources=[cli])
-    subject = make_subject(cli_collection)
+    subject = make_subject(cli_collection, prefix="$")
 
-    f1 = subject.on_message(make_message("cmd0 --opt"))
-    f2 = subject.on_message(make_message("cmd1 --opt"))
+    f1 = subject.on_message(make_message("$cmd0 --opt"))
+    f2 = subject.on_message(make_message("$cmd1 --opt"))
     assert_completes([f1, f2])
     assert all(slots)
 
@@ -121,38 +130,42 @@ def test_parses_multicommands(make_subject):
 @pytest.mark.parametrize(
     "prefix, name, message, expected",
     [
-        ("", "", "command", True),
-        ("++", "", "++command", True),
-        ("++", "invoke", "++invoke command", True),
-        ("++", "", "++  command", True),
-        ("++", "", "++--opt command", True),
-        ("", "invoke", "invokecommand", False),
-        ("", "invoke", "invoke--opt command", False),
-        ("", "invoke", "invoke command", True),
+        ("++", "", "", False),
+        ("++", "", "++", True),
+        ("++", "", "++arg", True),
+        ("++", "", "++  arg", True),
+        ("++", "", "++--opt arg", True),
+        ("", "invoke", "", False),
+        ("", "invoke", "invoke", True),
+        ("", "invoke", "invoke arg", True),
+        ("", "invoke", "invokearg", False),
+        ("", "invoke", "invoke --opt", True),
+        ("", "invoke", "invoke--opt arg", False),
+        ("++", "invoke", "", False),
+        ("++", "invoke", "++", False),
+        ("++", "invoke", "++invoke", True),
+        ("++", "invoke", "++  invoke", True),
+        ("++", "invoke", "++invoke arg", True),
+        ("++", "invoke", None, False),
     ],
 )
 def test_parses_name_and_prefix_correctly(
     make_subject, prefix, name, message, expected
 ):
-    cli_called = False
-    command_called = False
+    called = False
 
-    @click.group()
+    @click.command()
+    @click.argument("arg", required=False)
     @click.option("--opt", is_flag=True)
-    def cli(opt):
-        nonlocal cli_called
-        cli_called = True
-
-    @cli.command()
-    def command():
-        nonlocal command_called
-        command_called = True
+    def cli(arg, opt):
+        nonlocal called
+        called = True
 
     subject = make_subject(cli, prefix=prefix, name=name)
     f = subject.on_message(make_message(message))
 
-    assert_completes(f) if expected else time.sleep(0.5)
-    assert cli_called is command_called is expected
+    assert_completes(f) if expected else time.sleep(0.2)
+    assert called is expected
 
 
 def test_handles_echo(make_subject, smalld):
