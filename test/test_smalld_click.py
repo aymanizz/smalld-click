@@ -146,6 +146,7 @@ def test_parses_multicommands(make_subject):
         ("++", "invoke", "++invoke", True),
         ("++", "invoke", "++  invoke", True),
         ("++", "invoke", "++invoke arg", True),
+        ("++", "invoke", None, False),
     ],
 )
 def test_parses_name_and_prefix_correctly(

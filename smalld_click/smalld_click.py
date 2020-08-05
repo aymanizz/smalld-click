@@ -49,7 +49,7 @@ class SmallDCliRunner:
         self.executor.__exit__(*args)
 
     def on_message(self, msg):
-        content = msg["content"]
+        content = msg.get("content") or ""
         user_id = msg["author"]["id"]
         channel_id = msg["channel_id"]
 
