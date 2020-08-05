@@ -55,6 +55,15 @@ def make_subject(request, smalld):
     return factory
 
 
+def test_raises_error_for_empty_prefix_and_name(make_subject):
+    @click.command()
+    def command():
+        pass
+
+    with pytest.raises(ValueError) as exc_info:
+        make_subject(command, prefix="", name="")
+
+
 def test_exposes_correct_context(make_subject):
     conversation = None
 
@@ -110,10 +119,10 @@ def test_parses_multicommands(make_subject):
     create_command(1)
 
     cli_collection = click.CommandCollection(sources=[cli])
-    subject = make_subject(cli_collection)
+    subject = make_subject(cli_collection, prefix="$")
 
-    f1 = subject.on_message(make_message("cmd0 --opt"))
-    f2 = subject.on_message(make_message("cmd1 --opt"))
+    f1 = subject.on_message(make_message("$cmd0 --opt"))
+    f2 = subject.on_message(make_message("$cmd1 --opt"))
     assert_completes([f1, f2])
     assert all(slots)
 
@@ -121,8 +130,6 @@ def test_parses_multicommands(make_subject):
 @pytest.mark.parametrize(
     "prefix, name, message, expected",
     [
-        ("", "", "", True),
-        ("", "", "arg", True),
         ("++", "", "", False),
         ("++", "", "++", True),
         ("++", "", "++arg", True),

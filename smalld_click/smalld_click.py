@@ -26,10 +26,14 @@ class SmallDCliRunner:
         create_message=None,
         executor=None,
     ):
+        self.prefix = prefix.strip()
+        self.name = name.strip() if name is not None else cli.name or ""
+
+        if not self.prefix and not self.name:
+            raise ValueError("either prefix or name must be non empty")
+
         self.smalld = smalld
         self.cli = cli
-        self.prefix = prefix
-        self.name = name if name is not None else cli.name or ""
         self.timeout = timeout
         self.create_message = create_message if create_message else plain_message
         self.executor = executor if executor else ThreadPoolExecutor()
@@ -52,11 +56,11 @@ class SmallDCliRunner:
         handle = self.pending.pop((user_id, channel_id), None)
         if handle is not None:
             handle.complete_with(msg)
-            return
+            return None
 
         args = parse_command(self.prefix, self.name, content)
         if args is None:
-            return
+            return None
 
         return self.executor.submit(self.handle_command, msg, args)
 
@@ -90,14 +94,16 @@ def plain_message(msg):
 
 def parse_command(prefix, name, message):
     if not message.startswith(prefix):
-        return
+        return None
+
     cmd = message[len(prefix) :].lstrip()
     if not name:
         return cmd
-    cmd_name, *rest = cmd.split(maxsplit=1)
-    if cmd_name != name:
-        return
-    return "".join(rest)
+    elif not cmd:
+        return None
+
+    cmd_name, *args = cmd.split(maxsplit=1)
+    return "".join(args) if cmd_name == name else None
 
 
 def split_args(command):
