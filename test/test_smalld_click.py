@@ -1,6 +1,7 @@
 import time
 from concurrent import futures
 from functools import partial
+from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import click
@@ -19,7 +20,9 @@ POST_OPEN_DM_ROUTE = "/users/@me/channels"
 
 
 def make_message(content, author_id=AUTHOR_ID, channel_id=CHANNEL_ID):
-    return {"content": content, "channel_id": channel_id, "author": {"id": author_id}}
+    return SimpleNamespace(
+        content=content, channel_id=channel_id, author=SimpleNamespace(id=author_id)
+    )
 
 
 def assert_completes(future_or_futures, timeout=0.5):
@@ -50,7 +53,7 @@ def make_subject(request, smalld):
     def factory(*args, **kwargs):
         kwargs.setdefault("timeout", 1)
         subject = SmallDCliRunner(smalld, *args, **kwargs).__enter__()
-        subject.on_ready({"user": {"id": BOT_ID}})
+        subject.on_ready(SimpleNamespace(user=SimpleNamespace(id=BOT_ID)))
         request.addfinalizer(partial(subject.__exit__, None, None, None))
         return subject
 
@@ -384,8 +387,8 @@ def test_message_is_latest_message_payload(make_subject):
 
     assert_completes(f)
     assert msg1 is not msg2
-    assert msg1["content"] == "command"
-    assert msg2["content"] == "result"
+    assert msg1.content == "command"
+    assert msg2.content == "result"
 
 
 def test_ignores_messages_from_self(make_subject, smalld):

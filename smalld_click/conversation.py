@@ -14,8 +14,8 @@ class Conversation:
         self.runner = runner
         self.message = message
         self.smalld = runner.smalld
-        self.channel_id = message["channel_id"]
-        self.user_id = message["author"]["id"]
+        self.channel_id = message.channel_id
+        self.user_id = message.author.id
         self.echo_buffer = io.StringIO()
         self.is_safe = False
 
@@ -41,8 +41,10 @@ class Conversation:
 
     def get_reply(self, prompt):
         self.say(prompt, nl=False, flush=True)
-        self.message = self.runner.wait_for_message(self.user_id, self.channel_id)
-        return self.message["content"]
+        self.message = message = self.runner.wait_for_message(
+            self.user_id, self.channel_id
+        )
+        return message.content
 
     def flush(self):
         content = self.echo_buffer.getvalue()

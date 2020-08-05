@@ -50,15 +50,15 @@ class SmallDCliRunner:
         self.executor.__exit__(*args)
 
     def on_ready(self, data):
-        self.bot_id = data["user"]["id"]
+        self.bot_id = data.user.id
 
     def on_message(self, msg):
-        user_id = msg["author"]["id"]
+        user_id = msg.author.id
         if user_id == self.bot_id:
             return
 
-        content = msg.get("content") or ""
-        channel_id = msg["channel_id"]
+        content = getattr(msg, "content", None) or ""
+        channel_id = msg.channel_id
 
         handle = self.pending.pop((user_id, channel_id), None)
         if handle is not None:
