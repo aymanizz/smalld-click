@@ -41,26 +41,33 @@ class SmallDCliRunner:
 
     def __enter__(self):
         patch_click_functions()
-        self.smalld.on_message_create()(self.on_message)
+        self.smalld.on_ready(self.on_ready)
+        self.smalld.on_message_create(self.on_message)
         return self
 
     def __exit__(self, *args):
         restore_click_functions()
         self.executor.__exit__(*args)
 
+    def on_ready(self, data):
+        self.bot_id = data["user"]["id"]
+
     def on_message(self, msg):
-        content = msg.get("content") or ""
         user_id = msg["author"]["id"]
+        if user_id == self.bot_id:
+            return
+
+        content = msg.get("content") or ""
         channel_id = msg["channel_id"]
 
         handle = self.pending.pop((user_id, channel_id), None)
         if handle is not None:
             handle.complete_with(msg)
-            return None
+            return
 
         args = parse_command(self.prefix, self.name, content)
         if args is None:
-            return None
+            return
 
         return self.executor.submit(self.handle_command, msg, args)
 
