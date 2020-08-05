@@ -9,6 +9,7 @@ import pytest
 from smalld_click import SmallDCliRunner, get_conversation
 
 AUTHOR_ID = "author_id"
+BOT_ID = "bot_id"
 CHANNEL_ID = "channel_id"
 DM_CHANNEL_ID = "dm_channel_id"
 POST_MESSAGE_ROUTE = f"/channels/{CHANNEL_ID}/messages"
@@ -49,6 +50,7 @@ def make_subject(request, smalld):
     def factory(*args, **kwargs):
         kwargs.setdefault("timeout", 1)
         subject = SmallDCliRunner(smalld, *args, **kwargs).__enter__()
+        subject.on_ready({"user": {"id": BOT_ID}})
         request.addfinalizer(partial(subject.__exit__, None, None, None))
         return subject
 
@@ -384,3 +386,13 @@ def test_message_is_latest_message_payload(make_subject):
     assert msg1 is not msg2
     assert msg1["content"] == "command"
     assert msg2["content"] == "result"
+
+
+def test_ignores_messages_from_self(make_subject, smalld):
+    @click.command()
+    def command():
+        pass
+
+    subject = make_subject(command)
+    f = subject.on_message(make_message("command", author_id=BOT_ID))
+    assert f is None
